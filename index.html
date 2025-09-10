@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Flappy Bird — Responsive</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no" />
+  <style>
+    :root{
+      --accent:#16a085;
+      --danger:#e74c3c;
+      --dark:#222;
+      --text:#fff;
+      --btn-bg:#34495e;
+    }
+    html,body{
+      height:100%; margin:0;
+      font-family:system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+    }
+    body{
+      display:flex; justify-content:center; align-items:center;
+      background:linear-gradient(#87ceeb,#b3e5fc);
+      padding:0; margin:0;
+    }
+    #container{ 
+      width:100%; 
+      max-width:720px; 
+      display:flex; 
+      flex-direction:column; 
+      gap:10px; 
+      height:100vh; 
+      max-height:100vh;
+      justify-content:center;
+    }
+    .hud{
+      display:flex; justify-content:space-between; align-items:center;
+      background:#fff6; padding:6px 10px; border-radius:10px;
+      font-size:clamp(14px,2vw,18px);
+    }
+    .scorebox{ font-weight:900; font-size:clamp(18px,2.5vw,22px); color:var(--dark); }
+    .controls{ display:flex; gap:6px; }
+    .controls button{
+      padding:6px 10px; border:none; border-radius:8px;
+      background:var(--btn-bg); color:#fff; font-weight:700; cursor:pointer;
+      font-size:clamp(12px,1.5vw,16px);
+    }
+    .controls button:hover{ background:#2c3e50; }
+    .canvas-wrap{ 
+      width:100%; 
+      aspect-ratio: 600/900; 
+      max-height:70vh; 
+      margin:auto;
+    }
+    canvas{
+      width:100%; height:100%; border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3); background:#87ceeb;
+    }
+    .big-controls{
+      display:flex; justify-content:center; gap:12px; flex-wrap:wrap;
+    }
+    .big-controls button{
+      padding:10px 16px; font-size:clamp(14px,2vw,18px); font-weight:700;
+      border:none; border-radius:10px; cursor:pointer;
+      background:var(--btn-bg); color:#fff;
+    }
+    #flapBtnMobile{ background:var(--accent); }
+    #assistToggle{ background:#f39c12; }
+    .overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,0.6);
+      display:flex; justify-content:center; align-items:center;
+      visibility:hidden; opacity:0; transition:opacity .2s;
+    }
+    .overlay.active{ visibility:visible; opacity:1; }
+    .menu{
+      background:#222; color:#fff; padding:20px; border-radius:12px; text-align:center;
+      width:90%; max-width:300px;
+    }
+    .menu h2{ margin:0 0 10px; font-size:clamp(16px,3vw,22px); }
+    .menu .row{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .menu button{ background:#444; border:none; padding:6px 10px; border-radius:8px; color:#fff; cursor:pointer; font-size:clamp(12px,2vw,16px);}
+    .hint{ position:fixed; top:8px; left:8px; font-size:clamp(10px,2vw,14px); background:#fff6; padding:4px 8px; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="hud">
+      <div class="scorebox">Score: <span id="score">0</span></div>
+      <div class="controls">
+        <div>Best: <span id="best">0</span></div>
+        <button id="pauseBtn">⏸ Pause</button>
+        <button id="menuBtn">☰ Menu</button>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="c" width="600" height="900"></canvas>
+    </div>
+    <div class="big-controls">
+      <button id="flapBtnMobile">⬆ Flap</button>
+      <button id="restartBtn">⟳ Restart</button>
+      <button id="assistToggle">Assist: Off</button>
+    </div>
+  </div>
+  <div class="hint">Tap / Click / Space to flap</div>
+
+  <div class="overlay" id="overlay">
+    <div class="menu">
+      <h2 id="menuTitle">Paused</h2>
+      <p id="menuMsg">Use buttons to play. Assist auto-flaps if enabled.</p>
+      <p>Score: <strong id="menuScore">0</strong></p>
+      <p>Best: <strong id="menuBest">0</strong></p>
+      <div class="row">
+        <button id="resumeBtn">▶ Resume</button>
+        <button id="restartMenu">⟳ Restart</button>
+        <button id="menuQuit">Quit</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// same JavaScript from your last working version
+// (no changes in logic, only CSS/HTML updated for responsiveness)
+
+const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
+const scoreEl=document.getElementById("score"),bestEl=document.getElementById("best");
+const flapBtn=document.getElementById("flapBtnMobile"),restartBtn=document.getElementById("restartBtn");
+const pauseBtn=document.getElementById("pauseBtn"),menuBtn=document.getElementById("menuBtn");
+const overlay=document.getElementById("overlay"),menuTitle=document.getElementById("menuTitle");
+const menuScore=document.getElementById("menuScore"),menuBest=document.getElementById("menuBest");
+const resumeBtn=document.getElementById("resumeBtn"),restartMenu=document.getElementById("restartMenu");
+const menuQuit=document.getElementById("menuQuit"),assistToggle=document.getElementById("assistToggle");
+
+const VIRTUAL={w:600,h:900};
+let bird,pipes,tick,score,running,paused,bestScore,assistMode,animationId;
+
+// difficulty variables
+let pipeSpeed,gravity,gapSize;
+const INITIAL_SETTINGS={pipeSpeed:1.8,gravity:0.35,gapSize:200};
+
+// Reset game
+function reset(){
+  cancelAnimationFrame(animationId);
+  bird={x:110,y:VIRTUAL.h/2,vy:0,rad:18};
+  pipes=[];tick=0;score=0;running=true;paused=false;
+  pipeSpeed=INITIAL_SETTINGS.pipeSpeed;
+  gravity=INITIAL_SETTINGS.gravity;
+  gapSize=INITIAL_SETTINGS.gapSize;
+  assistMode=(localStorage.getItem("assist")==="true");
+  assistToggle.innerText=`Assist: ${assistMode?"On":"Off"}`;
+  scoreEl.innerText=score;
+  bestScore=Number(localStorage.getItem("best")||0);
+  bestEl.innerText=bestScore;
+  overlay.classList.remove("active");
+  animationId=requestAnimationFrame(update);
+}
+
+// Spawn pipes
+function spawnPipe(){
+  const margin=100;
+  const topH=margin+Math.random()*(VIRTUAL.h-margin-gapSize-100);
+  pipes.push({x:VIRTUAL.w+60,top:topH,gap:gapSize});
+}
+
+// Update loop
+function update(){
+  if(!running||paused){animationId=requestAnimationFrame(update);return;}
+  tick++;
+  if(tick%140===0)spawnPipe();
+  bird.vy+=gravity; bird.y+=bird.vy;
+  if(bird.y>VIRTUAL.h-60){running=false;gameOver();}
+  if(bird.y<0){bird.y=0;bird.vy=0;}
+  for(let p of pipes){
+    p.x-=pipeSpeed;
+    if(!p.passed&&p.x+60<bird.x){
+      p.passed=true;score++;scoreEl.innerText=score;
+      if(score>bestScore){bestScore=score;localStorage.setItem("best",bestScore);bestEl.innerText=bestScore;}
+      if(running && score%5===0 && pipeSpeed<4){
+        pipeSpeed+=0.15;
+        if(gapSize>140) gapSize-=5;
+      }
+    }
+    if(collide(bird,p)) {running=false;gameOver();}
+  }
+  pipes=pipes.filter(p=>p.x>-100);
+  draw();
+  animationId=requestAnimationFrame(update);
+}
+function flap(){if(running&&!paused)bird.vy=-8;}
+function gameOver(){
+  menuTitle.innerText="Game Over!";
+  menuScore.innerText=score; menuBest.innerText=bestScore;
+  overlay.classList.add("active");
+  cancelAnimationFrame(animationId);
+}
+function draw(){
+  ctx.fillStyle="#87ceeb";ctx.fillRect(0,0,VIRTUAL.w,VIRTUAL.h);
+  ctx.fillStyle="#1e8f3e";ctx.fillRect(0,VIRTUAL.h-60,VIRTUAL.w,60);
+  for(let p of pipes){
+    ctx.fillStyle="#2ecc71";ctx.fillRect(p.x,0,60,p.top);
+    ctx.fillRect(p.x,p.top+p.gap,60,VIRTUAL.h-(p.top+p.gap)-60);
+  }
+  ctx.fillStyle="#ffcc00";ctx.beginPath();ctx.arc(bird.x,bird.y,bird.rad,0,Math.PI*2);ctx.fill();
+}
+function collide(b,p){
+  return (b.x+b.rad>p.x&&b.x-b.rad<p.x+60)&&(b.y-b.rad<p.top||b.y+b.rad>p.top+p.gap);
+}
+// Input
+window.addEventListener("keydown",e=>{if(e.code==="Space"){flap();}if(e.key.toLowerCase()==="r")reset();});
+canvas.addEventListener("mousedown",flap);
+canvas.addEventListener("touchstart",e=>{e.preventDefault();flap();},{passive:false});
+flapBtn.addEventListener("click",flap);
+restartBtn.addEventListener("click",reset);
+restartMenu.addEventListener("click",reset);
+pauseBtn.addEventListener("click",()=>{paused=!paused;if(paused){overlay.classList.add("active");menuTitle.innerText="Paused";}else{overlay.classList.remove("active");}});
+menuBtn.addEventListener("click",()=>{paused=true;overlay.classList.add("active");menuTitle.innerText="Menu";});
+resumeBtn.addEventListener("click",()=>{paused=false;overlay.classList.remove("active");});
+menuQuit.addEventListener("click",()=>{reset();paused=true;overlay.classList.add("active");menuTitle.innerText="Menu";});
+assistToggle.addEventListener("click",()=>{assistMode=!assistMode;localStorage.setItem("assist",assistMode?"true":"false");assistToggle.innerText=`Assist: ${assistMode?"On":"Off"}`;});
+reset();
+</script>
+</body>
+</html>
